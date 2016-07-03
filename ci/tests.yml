@@ -3,10 +3,10 @@ platform: linux
 
 image_resource:
   type: docker-image
-  source: {repository: concourse/git-resource}
+  source: {repository: concourse/git-branches-resource}
 
 inputs:
-- name: git-resource
+- name: git-branches-resource
 
 run:
-  path: git-resource/test/all.sh
+  path: git-branches-resource/test/all.sh

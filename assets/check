@@ -8,9 +8,6 @@ exec 1>&2 # redirect all output to stderr for logging
 
 source $(dirname $0)/common.sh
 
-# for jq
-PATH=/usr/local/bin:$PATH
-
 payload=$TMPDIR/git-resource-request
 
 cat > $payload <&0
@@ -20,64 +17,38 @@ configure_git_ssl_verification $payload
 configure_credentials $payload
 
 uri=$(jq -r '.source.uri // ""' < $payload)
-branch=$(jq -r '.source.branch // ""' < $payload)
-paths="$(jq -r '(.source.paths // ["."])[]' < $payload)" # those "'s are important
-ignore_paths="$(jq -r '":!" + (.source.ignore_paths // [])[]' < $payload)" # these ones too
-tag_filter=$(jq -r '.source.tag_filter // ""' < $payload)
 git_config_payload=$(jq -r '.source.git_config // []' < $payload)
-ref=$(jq -r '.version.ref // ""' < $payload)
-skip_ci_disabled=$(jq -r '.source.disable_ci_skip // false' < $payload)
+
+previous_branches="$(jq -r '.version.branches // ""' < $payload)"
 
 configure_git_global "${git_config_payload}"
 
-destination=$TMPDIR/git-resource-repo-cache
+current_branches="$(git ls-remote -h "$uri" | awk '{print $NF}' | sed 's/refs\/heads\///' | sort)"
 
-if [ -d $destination ]; then
-  cd $destination
-  git fetch
-  git reset --hard FETCH_HEAD
+set_sub() {
+  jq -nr '($a | split("\n")) - ($b | split("\n")) | join("\n")' \
+    --arg a "$1" \
+    --arg b "$2"
+}
+
+echo "previous: $previous_branches"
+echo "current:  $current_branches"
+
+if [ "$current_branches" = "$previous_branches" ]; then
+  echo '[]' >&3
 else
-  branchflag=""
-  if [ -n "$branch" ]; then
-    branchflag="--branch $branch"
-  fi
+  removed="$(set_sub "$previous_branches" "$current_branches")"
+  added="$(set_sub "$current_branches" "$previous_branches")"
 
-  git clone --single-branch $uri $branchflag $destination
-  cd $destination
-fi
-
-if [ -n "$ref" ] && git cat-file -e "$ref"; then
-  init_commit=$(git rev-list --max-parents=0 HEAD)
-  if [ "${ref}" = "${init_commit}" ]; then
-    log_range="--reverse HEAD"
-  else
-    log_range="--reverse ${ref}~1..HEAD"
-  fi
-else
-  log_range="-1"
-fi
-
-if [ $paths = '.' ] && [ -z $ignore_paths ]; then
-  paths_search=""
-else
-  paths_search="-- $paths $ignore_paths"
-fi
-
-ci_skip=""
-if [ "$skip_ci_disabled" != "true" ]; then
-  ci_skip="--grep \\[ci\sskip\\] --invert-grep"
-fi
-
-if [ -n "$tag_filter" ]; then
-  {
-    if [ -n "$ref" ]; then
-      git tag --list "$tag_filter" --sort=creatordate --contains $ref
-    else
-      git tag --list "$tag_filter" --sort=creatordate | tail -1
-    fi
-  } | jq -R '.' | jq -s "map({ref: .})" >&3
-else
-  {
-    git log $ci_skip --format='%H' $log_range $paths_search
-  } | jq -R '.' | jq -s "map({ref: .})" >&3
+  jq -n '[
+    {
+      removed: $removed,
+      added: $added,
+      branches: $branches
+    }
+  ]' \
+    --arg removed "$removed" \
+    --arg added "$added" \
+    --arg branches "$current_branches" \
+    >&3
 fi
