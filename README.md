@@ -3,6 +3,17 @@
 Tracks the set of branches that exist in a [git](http://git-scm.com/)
 repository.
 
+## Installation
+
+Add the following `resource_types` entry to your pipeline:
+
+```yaml
+---
+resource_types:
+- name: git-branches
+  type: docker-image
+  source: {repository: vito/git-branches-resource}
+```
 
 ## Source Configuration
 
