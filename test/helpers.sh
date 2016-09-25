@@ -1,10 +1,17 @@
-#!/bin/sh
+#!/bin/bash
 
 set -e -u
 
 set -o pipefail
 
-resource_dir=/opt/resource
+export TMPDIR_ROOT=$(mktemp -d /tmp/git-tests.XXXXXX)
+trap "rm -rf $TMPDIR_ROOT" EXIT
+
+if [ -d /opt/resource ]; then
+  resource_dir=/opt/resource
+else
+  resource_dir=$(cd $(dirname $0)/../assets && pwd)
+fi
 
 run() {
   export TMPDIR=$(mktemp -d ${TMPDIR_ROOT}/git-tests.XXXXXX)
@@ -74,24 +81,46 @@ check_uri() {
   }' --arg uri "$1" | ${resource_dir}/check | tee /dev/stderr
 }
 
+check_uri_branches() {
+  jq -n '{
+    source: {
+      uri: $uri,
+      branches: ($branches | split(" "))
+    }
+  }' --arg uri "$1" --arg branches "$*" | ${resource_dir}/check | tee /dev/stderr
+}
+
 check_uri_from() {
+  uri=$1
+
+  shift
+
+  branches=$(echo "$@" | jq -R 'split(" ") | map(split("=") | {key: .[0], value: .[1]}) | from_entries')
+
   jq -n '{
     source: {
       uri: $uri
     },
-    version: {
-      branches: $branches
-    }
-  }' --arg uri "$1" --arg branches "$2" | ${resource_dir}/check | tee /dev/stderr
+    version: ({changed: "doesnt-matter"} + $branches)
+  }' --arg uri "$uri" --argjson branches "$branches" | ${resource_dir}/check | tee /dev/stderr
 }
 
-get_branches_added_removed() {
+get_changed_branch() {
+  uri=$1
+  dest=$2
+  changed=$3
+
+  shift 3
+
+  branches=$(echo "$@" | jq -R 'split(" ") | map(split("=") | {key: .[0], value: .[1]}) | from_entries')
+
   jq -n '{
-    version: {
-      branches: $branches,
-      added: $added,
-      removed: $removed
-    }
-  }' --arg branches "$2" --arg added "$3" --arg removed "$4" \
-    | ${resource_dir}/in "$1" | tee /dev/stderr
+    source: {
+      uri: $uri
+    },
+    version: ({changed: $changed} + $branches)
+  }' --arg uri "$uri" --arg changed "$changed" --argjson branches "$branches" |
+    env GIT_RESOURCE_IN=$(dirname $0)/git-in-stub \
+      ${resource_dir}/in "$dest" |
+    tee /dev/stderr
 }

@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 # vim: set ft=sh
 
 set -e
@@ -8,7 +8,7 @@ exec 1>&2 # redirect all output to stderr for logging
 
 source $(dirname $0)/common.sh
 
-payload=$TMPDIR/git-resource-request
+payload=$TMPDIR/git-branch-heads-resource-request
 
 cat > $payload <&0
 
@@ -17,38 +17,34 @@ configure_git_ssl_verification $payload
 configure_credentials $payload
 
 uri=$(jq -r '.source.uri // ""' < $payload)
+branch_filter=$(jq -r '.source.branches // [] | join(" ")' < $payload)
 git_config_payload=$(jq -r '.source.git_config // []' < $payload)
 
 previous_branches="$(jq -r '.version.branches // ""' < $payload)"
 
 configure_git_global "${git_config_payload}"
 
-current_branches="$(git ls-remote -h "$uri" | awk '{print $NF}' | sed 's/refs\/heads\///' | sort)"
+current_heads=$(git ls-remote -h "$uri" $branch_filter | sed 's/refs\/heads\///' | awk '{print $2, $1}' | sort)
 
-set_sub() {
-  jq -nr '($a | split("\n")) - ($b | split("\n")) | join("\n")' \
-    --arg a "$1" \
-    --arg b "$2"
-}
+current_heads_map=$(
+  jq -n '
+    $heads | rtrimstr("\n") | split("\n") |
+      map(split(" ") | {key: .[0], value: .[1]}) |
+      from_entries
+  ' --arg heads "$current_heads"
+)
 
-echo "previous: $previous_branches"
-echo "current:  $current_branches"
+echo "$current_heads" |
+  while read branch ref; do
+    if [ -z "$branch" ]; then
+      continue
+    fi
 
-if [ "$current_branches" = "$previous_branches" ]; then
-  echo '[]' >&3
-else
-  removed="$(set_sub "$previous_branches" "$current_branches")"
-  added="$(set_sub "$current_branches" "$previous_branches")"
-
-  jq -n '[
-    {
-      removed: $removed,
-      added: $added,
-      branches: $branches
-    }
-  ]' \
-    --arg removed "$removed" \
-    --arg added "$added" \
-    --arg branches "$current_branches" \
-    >&3
-fi
+    prev_ref=$(jq -r '.version | .[$branch]' --arg branch "$branch" < $payload)
+    if [ "$ref" != "$prev_ref" ]; then
+      echo "$branch"
+    fi
+  done |
+  jq -R . |
+  jq -s 'map({changed: .} + $branches)' \
+    --argjson branches "$current_heads_map" >&3

@@ -1,7 +1,11 @@
-# Git Branches Resource
+# Git Branch `HEAD`s Resource
 
-Tracks the set of branches that exist in a [git](http://git-scm.com/)
-repository.
+Tracks changes made to all branches (or branches matching a filter). This will
+skip commits on individual branches, but ensure a version is emitted for each
+change to the branches.
+
+**This resource is meant to be used with [`version:
+every`](https://concourse.ci/get-step.html#get-version).**
 
 ## Installation
 
@@ -10,64 +14,40 @@ Add the following `resource_types` entry to your pipeline:
 ```yaml
 ---
 resource_types:
-- name: git-branches
+- name: git-branch-heads
   type: docker-image
-  source: {repository: vito/git-branches-resource}
+  source: {repository: vito/git-branch-heads-resource}
 ```
 
 ## Source Configuration
 
-* `uri`: *Required.* The location of the repository.
+All source configuration is based on the [Git
+resource](https://github.com/concourse/git-resource), with the addition of the
+following property:
 
-* `private_key`: *Optional.* Private key to use when pulling/pushing.
-    Example:
-    ```
-    private_key: |
-      -----BEGIN RSA PRIVATE KEY-----
-      MIIEowIBAAKCAQEAtCS10/f7W7lkQaSgD/mVeaSOvSF9ql4hf/zfMwfVGgHWjj+W
-      <Lots more text>
-      DWiJL+OFeg9kawcUL6hQ8JeXPhlImG6RTUffma9+iGQyyBMCGd1l
-      -----END RSA PRIVATE KEY-----
-    ```
+* `branches`: *Optional.* An array of branch name filters. If not specified,
+  all branches are tracked.
 
-* `username`: *Optional.* Username for HTTP(S) auth when pulling/pushing.
-  This is needed when only HTTP/HTTPS protocol for git is available (which does not support private key auth)
-  and auth is required.
+The `branch` configuration from the original resource is ignored for `check`.
 
-* `password`: *Optional.* Password for HTTP(S) auth when pulling/pushing.
-
-* `skip_ssl_verification`: *Optional.* Skips git ssl verification by exporting
-  `GIT_SSL_NO_VERIFY=true`.
-
-* `git_config`: *Optional*. If specified as (list of pairs `name` and `value`)
-  it will configure git global options, setting each name with each value.
-
-  This can be useful to set options like `credential.helper` or similar.
-
-  See the [`git-config(1)` manual page](https://www.kernel.org/pub/software/scm/git/docs/git-config.html)
-  for more information and documentation of existing git options.
 
 ### Example
 
-Resource configuration for a private repo:
+Resource configuration for a repo with a bunch of branches named `wip-*`:
 
 ``` yaml
 resources:
-- name: source-code
-  type: git-branches
+- name: my-repo-with-feature-branches
+  type: git-branch-heads
   source:
-    uri: git@github.com:concourse/git-resource.git
-    private_key: |
-      -----BEGIN RSA PRIVATE KEY-----
-      MIIEowIBAAKCAQEAtCS10/f7W7lkQaSgD/mVeaSOvSF9ql4hf/zfMwfVGgHWjj+W
-      <Lots more text>
-      DWiJL+OFeg9kawcUL6hQ8JeXPhlImG6RTUffma9+iGQyyBMCGd1l
-      -----END RSA PRIVATE KEY-----
+    uri: https://github.com/concourse/atc
+    branches: [wip-*]
 ```
 
 ## Behavior
 
-### `check`: Check for changes to the branch set.
+
+### `check`: Check for changes to all branches.
 
 The repository is cloned (or pulled if already present), all remote branches
 are enumerated, and compared to the existing set of branches.
@@ -75,14 +55,14 @@ are enumerated, and compared to the existing set of branches.
 If any branches are new or removed, a new version is emitted including the
 delta.
 
-### `in`: Produce the version's info as files.
+### `in`: Fetch the commit that changed the branch.
 
-Produces the following files based on the version being fetched:
+This resource delegates entirely to the `in` of the original Git resource, by
+specifying `source.branch` as the branch that changed, and `version.ref` as the
+commit on the branch.
 
-* `branches`: A file containing the list of current branches, one per line.
-* `added`: A file containing the newly cretated branches, one per line.
-* `removed`: A file containing the branches that have been removed, one per
-  line.
+All `params` and `source` configuration of the original resource will be
+respected.
 
 
 ### `out`: No-op.
