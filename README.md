@@ -27,7 +27,7 @@ following property:
 
 * `branches`: *Optional.* An array of branch name filters. If not specified,
   all branches are tracked.
-* `excluded_branches`: *Optional* A Regex for branches to be excluded. If not specified,
+* `exclude`: *Optional* A Regex for branches to be excluded. If not specified,
   no branches are excluded.
 
 The `branch` configuration from the original resource is ignored for `check`.
@@ -53,7 +53,7 @@ resources:
   type: git-branch-heads
   source:
     uri: https://github.com/concourse/atc
-    excluded_branches: version|feature/.*
+    exclude: version|feature/.*
 ```
 
 ## Behavior

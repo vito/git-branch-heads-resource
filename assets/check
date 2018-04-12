@@ -17,7 +17,7 @@ configure_git_ssl_verification $payload
 configure_credentials $payload
 
 uri=$(jq -r '.source.uri // ""' < $payload)
-exclude_branches=$(jq -r '.source.excluded_branches // ""' < $payload)
+exclude_branches=$(jq -r '.source.exclude // ""' < $payload)
 branch_filter=$(jq -r '.source.branches // [] | join(" ")' < $payload)
 git_config_payload=$(jq -r '.source.git_config // []' < $payload)
 
