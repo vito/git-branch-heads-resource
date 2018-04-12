@@ -27,6 +27,8 @@ following property:
 
 * `branches`: *Optional.* An array of branch name filters. If not specified,
   all branches are tracked.
+* `exclude`: *Optional* A Regex for branches to be excluded. If not specified,
+  no branches are excluded.
 
 The `branch` configuration from the original resource is ignored for `check`.
 
@@ -42,6 +44,16 @@ resources:
   source:
     uri: https://github.com/concourse/atc
     branches: [wip-*]
+```
+Resource configuration for a repo with `version` and branches beginning with `feature/` filtered out:
+
+``` yaml
+resources:
+- name: my-repo-with-feature-branches
+  type: git-branch-heads
+  source:
+    uri: https://github.com/concourse/atc
+    exclude: version|feature/.*
 ```
 
 ## Behavior
