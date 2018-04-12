@@ -45,7 +45,7 @@ resources:
     uri: https://github.com/concourse/atc
     branches: [wip-*]
 ```
-Resource configuration for a repo with version and branches beginning with feature/ filtered out:
+Resource configuration for a repo with `version` and branches beginning with `feature/` filtered out:
 
 ``` yaml
 resources:
