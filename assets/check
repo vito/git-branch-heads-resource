@@ -24,7 +24,7 @@ previous_branches="$(jq -r '.version.branches // ""' < $payload)"
 
 configure_git_global "${git_config_payload}"
 
-current_heads=$(git ls-remote -h "$uri" $branch_filter | sed 's/refs\/heads\///' | awk '{print $2, $1}' | sort)
+current_heads=$(git ls-remote -h "$uri" $branch_filter | sed 's/refs\/heads\///' | awk '{print $2, $1}' | sort -V)
 
 current_heads_map=$(
   jq -n '
