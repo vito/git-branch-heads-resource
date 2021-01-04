@@ -1,3 +1,5 @@
+> Archiving; follow the [Concourse v10 roadmap](https://github.com/concourse/concourse/blob/d1dd60f7555f6e7f7d22b0e55289c24534c34b45/README.md#the-road-to-concourse-v10) which will eliminate the need for this pretty hacky resource type.
+
 # Git Branch `HEAD`s Resource
 
 Tracks changes made to all branches (or branches matching a filter). This will
